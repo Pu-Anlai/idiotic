@@ -70,17 +70,13 @@ class Id3(object):
             mutid3.WPUB: 'wwwpublisher'}
         self.tags = self._get_tag_dictionary(self.mut)
 
-
-        # TODO: Go through the mutagen id3 frames and populate the dictionary.
-
     def _get_tag_dictionary(self, mut):
         tag_dict = {}
         for frame in mut.tags.values():
             # try for text frames
             try:
                 plain_tag = self.text_frames[type(frame)]
-                tag_content_list = frame.text
-                tag_dict[plain_tag] = ';; '.join(tag_content_list)
+                tag_dict[plain_tag] = ';; '.join(frame.text)
                 continue
             except KeyError:
                 pass
@@ -98,13 +94,23 @@ class Id3(object):
             # try for url frames
             try:
                 plain_tag = self.url_frames[type(frame)]
-                tag_content = frame.url
-                tag_dict[plain_tag] = tag_content
+                tag_dict[plain_tag] = frame.url
                 continue
             except KeyError:
                 pass
 
-            # TODO: handle frames that allow duplicates: TXXX, WXXX,
-            # uurl_frames
+        self._populate_arbitrary_tags(mut, tag_dict, 'TXXX')
 
         return tag_dict
+
+    # TODO: handle frames that allow duplicates: TXXX, WXXX,
+    # uurl_frames
+    # don't forget about __tags when converting back to mutagen
+
+    def _populate_arbitrary_tags(self, mut, tag_dict, base_frame):
+        """Add non-standardized tags to $tag_dict."""
+        for frame in mut.tags.getall(base_frame):
+            if frame.desc not in tag_dict.keys():
+                tag_dict[frame.desc] = ';; '.join(frame.text)
+            else:
+                tag_dict['__' + frame.desc] = ';; '.join(frame.text)
