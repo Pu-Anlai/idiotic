@@ -75,42 +75,74 @@ class Id3(object):
         for frame in mut.tags.values():
             # try for text frames
             try:
-                plain_tag = self.text_frames[type(frame)]
-                tag_dict[plain_tag] = ';; '.join(frame.text)
+                self._populate_text_tags(mut, tag_dict, frame)
                 continue
             except KeyError:
                 pass
 
             # try for time frames
             try:
-                plain_tag = self.time_frames[type(frame)]
-                tag_content_list = [time.text for time in frame.text]
-                tag_content = ';; '.join(tag_content_list)
-                tag_dict[plain_tag] = tag_content
+                self._populate_time_tags(mut, tag_dict, frame)
                 continue
             except KeyError:
                 pass
 
             # try for url frames
             try:
-                plain_tag = self.url_frames[type(frame)]
-                tag_dict[plain_tag] = frame.url
+                self._populate_url_tags(mut, tag_dict, frame)
                 continue
             except KeyError:
                 pass
 
-        self._populate_arbitrary_tags(mut, tag_dict, 'TXXX')
+            # try for genre frame
+            try:
+                self._populate_genre_tag(mut, tag_dict, frame)
+            except AssertionError:
+                pass
+
+        self._populate_comment_tag(mut, tag_dict)
+        self._populate_arbitrary_tags(mut, tag_dict, 'TXXX', 'text')
+        self._populate_arbitrary_tags(mut, tag_dict, 'WXXX', 'url')
 
         return tag_dict
 
-    # TODO: handle frames that allow duplicates: TXXX, WXXX,
-    # uurl_frames
-    # don't forget about __tags when converting back to mutagen
+    # TODO: handle uurl_frames and other irregular frames (cf. puddletag)
+    # don't forget about __ tags when converting back to mutagen
 
-    def _populate_arbitrary_tags(self, mut, tag_dict, base_frame):
+    def _populate_text_tags(self, mut, tag_dict, frame):
+        plain_tag = self.text_frames[type(frame)]
+        tag_dict[plain_tag] = ' ;; '.join(frame.text)
+
+    def _populate_time_tags(self, mut, tag_dict, frame):
+        plain_tag = self.time_frames[type(frame)]
+        tag_content_list = [time.text for time in frame.text]
+        tag_content = ' ;; '.join(tag_content_list)
+        tag_dict[plain_tag] = tag_content
+
+    def _populate_url_tags(self, mut, tag_dict, frame):
+        plain_tag = self.url_frames[type(frame)]
+        tag_dict[plain_tag] = frame.url
+
+    def _populate_genre_tag(self, mut, tag_dict, frame):
+        # pseudo-"if" for unified EAFP-approach
+        assert type(frame) is mutid3.TCON
+        tag_dict['genre'] = ' ;; '.join(frame.genres)
+
+    def _populate_comment_tag(self, mut, tag_dict):
+        for frame in mut.tags.getall('COMM'):
+            if frame.desc == '':
+                tag_dict['comment'] = ' ;; '.join(frame.text)
+            else:
+                tag_name = 'comment' + '__' + frame.desc
+                tag_dict[tag_name] = ' ;; '.join(frame.text)
+
+    def _populate_arbitrary_tags(self, mut, tag_dict,
+                                 base_frame, content_field):
         """Add non-standardized tags to $tag_dict."""
         for frame in mut.tags.getall(base_frame):
             if frame.desc not in tag_dict.keys():
-                tag_dict[frame.desc] = ';; '.join(frame.text)
+                content_list = getattr(frame, content_field)
+                tag_dict[frame.desc] = ' ;; '.join(content_list)
             else:
-                tag_dict['__' + frame.desc] = ';; '.join(frame.text)
+                tag_name = frame.FrameID + '__' + frame.desc
+                tag_dict[tag_name] = ' ;; '.join(frame.text)
