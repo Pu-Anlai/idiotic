@@ -96,7 +96,19 @@ class Id3(object):
 
             # try for genre frame
             try:
-                self._populate_genre_tag(mut, tag_dict, frame)
+                self._populate_genre_tag(tag_dict, frame)
+            except AssertionError:
+                pass
+
+            # try for playcount frame
+            try:
+                self._populate_playcount_tag(tag_dict, frame)
+            except AssertionError:
+                pass
+
+            # try for popularimeter frame
+            try:
+                self._populate_popularimeter_tag(tag_dict, frame)
             except AssertionError:
                 pass
 
@@ -106,7 +118,7 @@ class Id3(object):
 
         return tag_dict
 
-    # TODO: handle uurl_frames and other irregular frames (cf. puddletag)
+    # TODO: process uslt, ufid, rva2, uurl_frames (cf. puddle_id3.py)
     # don't forget about __ tags when converting back to mutagen
 
     def _populate_text_tags(self, mut, tag_dict, frame):
@@ -123,10 +135,21 @@ class Id3(object):
         plain_tag = self.url_frames[type(frame)]
         tag_dict[plain_tag] = frame.url
 
-    def _populate_genre_tag(self, mut, tag_dict, frame):
+    def _populate_genre_tag(self, tag_dict, frame):
         # pseudo-"if" for unified EAFP-approach
         assert type(frame) is mutid3.TCON
         tag_dict['genre'] = ' ;; '.join(frame.genres)
+
+    def _populate_playcount_tag(self, tag_dict, frame):
+        assert type(frame) is mutid3.PCNT
+        tag_dict['playcount'] = frame.count
+
+    def _populate_popularimeter_tag(self, tag_dict, frame):
+        assert type(frame) is mutid3.POPM
+        try:
+            tag_dict['popularimeter'] = frame.count
+        except AttributeError:
+            pass
 
     def _populate_comment_tag(self, mut, tag_dict):
         for frame in mut.tags.getall('COMM'):
